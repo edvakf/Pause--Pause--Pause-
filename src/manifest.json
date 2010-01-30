@@ -1,0 +1,13 @@
+{
+  "name": "Pause! Pause! Pause!",
+  "background_page": "background.html",
+  "content_scripts": [ {
+     "js": [ "content.js" ],
+     "css": [ "content.css" ],
+     "matches": [ "http://*/*", "https://*/*" ],
+     "run_at": "document_end"
+  } ],
+  "description": "Pause animated images until you click to start it.",
+  "permissions": [ "http://*/*", "https://*/*" ],
+  "version": "0.0.1"
+}
