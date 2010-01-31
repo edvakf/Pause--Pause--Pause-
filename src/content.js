@@ -11,7 +11,7 @@ document.addEventListener('DOMAttrChanged', handleAttrChange, false);
 })()
 
 function handleInsert(ev) {
-  ev.stopPropergation();
+  ev.stopPropagation();
   setTimeout(function() {
     var node = ev.target;
     if (node.nodeType === Node.ELEMENT_NODE) {
@@ -28,7 +28,7 @@ function handleInsert(ev) {
 }
 
 function handleAttrChange(ev) {
-  ev.stopPropergation();
+  ev.stopPropagation();
   setTimeout(function() {
     var node = ev.target;
     if (node.nodeName === 'IMG' || node.nodeName === 'img') {
