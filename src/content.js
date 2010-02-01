@@ -42,11 +42,13 @@ function pauseAnimation(img) {
 
   img.setAttribute('data-original-src', img.src);
   chrome.extension.sendRequest(ExtID, img.src, function(res) {
-    if (img.parentNode &&  // if img is still in the document
-        res.lastIndexOf('ERROR: ', 0) !== 0) { // if no error occurred
-      img.src = res;
-
-      img.addEventListener('click', handleClick, false);
+    if (img.parentNode) {  // if img is still in the document
+      if (res.lastIndexOf('ERROR: ', 0) === 0) { // if an error occurred
+        img.removeAttribute('data-original-src');
+      } else {
+        img.src = res;
+        img.addEventListener('click', handleClick, false);
+      }
     } else { // release (probably not necessary)
       img = null;
     }
