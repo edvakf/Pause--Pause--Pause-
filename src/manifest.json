@@ -9,5 +9,5 @@
   } ],
   "description": "Pause animated images until you click to start it.",
   "permissions": [ "http://*/*", "https://*/*" ],
-  "version": "0.0.3"
+  "version": "0.0.5"
 }

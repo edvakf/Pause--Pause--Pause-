@@ -1,19 +1,64 @@
-chrome.extension.onRequest.addListener(function(url, sender, response) {
-  request(
-    url,
-    function(xhr) { // callback
-      try {
-        var singleImageSrc = getSingleImage(xhr);
-        response(singleImageSrc);
-      } catch(e) {
-        console.log(e);
-        response('ERROR: ' + e);
+chrome.extension.onRequest.addListener(function(data, sender, response) {
+  if (data.type === 'img') {
+    request(
+      data.src,
+      function(xhr) { // callback
+        try {
+          var singleImageSrc = getSingleImage(xhr);
+          response({dataUrl:singleImageSrc});
+        } catch(e) {
+          //console.log(e);
+          response({error:e.message});
+        }
+      },
+      function() { // errorback
+        response({errro:'ERROR: Failed loading image.'});
       }
-    },
-    function() { // errorback
-      response('ERROR: Failed loading image.');
-    }
-  )
+    );
+  } else if (data.type === 'css') {
+    request(
+      data.src,
+      function(xhr) { // callback
+        try {
+          var css = xhr.responseText;
+          var urls = extractAnimationUrls(css);
+          //console.log(urls);
+          count = urls.length;
+          if (count === 0) return response({error:'No animation images to replace'});
+          var replaceUrls = {};
+          urls.forEach(function(url) {
+            request(makeAbsoluteUrl(url, data.baseUrl), 
+              function(res) {
+                try {
+                  replaceUrls[url] = getSingleImage(res);
+                } catch(e) {
+                  //console.log(e);
+                };
+                if (--count === 0) {
+                  css = makeReplacementCSS(css, replaceUrls);
+                  //if (!css) return response({error:'No animation images to replace'});
+                  return response({cssText: css});
+                }
+              }, 
+              function() {
+                if (--count === 0) {
+                  css = makeReplacementCSS(css, replaceUrls);
+                  //if (!css) return response({error:'No animation images to replace'});
+                  return response({cssText: css});
+                }
+              }
+            );
+          });
+        } catch(e) {
+          //console.log(e);
+          response({error:e.message});
+        }
+      },
+      function() { // errorback
+        response({errro:'ERROR: Failed loading image.'});
+      }
+    );
+  }
 });
 
 function request(url, callback, errorback) {
@@ -78,3 +123,30 @@ function getSingleImage(xhr) {
   throw new Error('ERROR: Image is not an animatable format.');
 }
 
+
+function extractAnimationUrls(cssText) {
+  var urls = [], m;
+  while (m = /url\(\s*(\S+)\s*\)/g.exec(cssText)) {
+    var url = m[1];
+    if (url.lastIndexOf('data:',0) !== 0 && !/\.(?:jpe?g|jp2|png|tiff?|bmp|dib|svgz?|ico)\b/.test(url)) urls.push(url);
+  }
+  return urls.filter(function(x, i) {return urls.indexOf(x) === i}); // unique
+}
+
+function makeAbsoluteUrl(url, baseUrl) {
+  if (url.indexOf(':') >= 0) return url;
+  if (url.indexOf('/') === 0) return baseUrl.replace(/^(https?:\/\/[^\/]*)(.*)$/, function($0,$1,$2) {return $1 + url});
+  return baseUrl + url;
+}
+
+function makeReplacementCSS(cssText, replaceUrls) {
+  var flag = false;
+  Object.keys(replaceUrls).forEach(function(url) {
+    cssText = cssText.replace(new RegExp('url\\(\\s*'+url.replace(/\W/g,'\\$&')+'\\s*\\)', 'g'), function($0) {
+      flag = true;
+      return 'url('+replaceUrls[url]+')';
+    });
+  });
+  if (!flag) return '';
+  return cssText;
+}
