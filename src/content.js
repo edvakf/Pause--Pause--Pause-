@@ -1,92 +1,41 @@
 var ExtID = chrome.extension.getURL('').match(/chrome-extension:\/\/([^\/]+)\//)[1];
 
-document.addEventListener('DOMNodeInserted', handleInsert, false);
-document.addEventListener('DOMAttrChanged', handleAttrChange, false);
-(function() {
-  var imgs = document.images;
-  for (var i = 0; i < imgs.length; i++) {
-    pauseAnimationImg(imgs[i]);
-  }
-  var sheets = document.styleSheets;
-  for (var i = 0; i < sheets.length; i++) {
-    var rules = sheets[i].cssRules;
-    if (!rules) { // cross origin request
-      pauseAnimationCSS(sheets[i]);
-      continue;
-    }
-    for (var j = 0; j < rules.length; j++) {
-      var style = rules[j].style;
-      for (var k = 0; k < style.length; k++) {
-        var dec = style[k];
-        if (/url\(\s*(\S+)\s*\)/.test(style[dec])) {
-          var url = RegExp.$1;
-          if (url.lastIndexOf('data:',0) !== 0 && !/\.(?:jpe?g|jp2|png|tiff?|bmp|dib|svgz?|ico)\b/.test(url)) {
-            pauseAnimationStyleRule(style, dec, url);
-          }
-        }
-      }
-    }
-  }
-})()
-
-function handleInsert(ev) {
-  ev.stopPropagation();
-  setTimeout(function() {
-    var node = ev.target;
-    if (node.nodeType === Node.ELEMENT_NODE) {
-      if (node.nodeName === 'IMG' || node.nodeName === 'img') {
-        pauseAnimationImg(node);
-      } else {
-        var imgs = node.getElementsByTagName('img');
-        for (var i = 0; i < imgs.length; i++) {
-          pauseAnimationImg(imgs[i]);
-        }
-      }
-    }
-  }, 50);
-}
-
-function handleAttrChange(ev) {
-  ev.stopPropagation();
-  setTimeout(function() {
-    var node = ev.target;
-    if (node.nodeName === 'IMG' || node.nodeName === 'img') {
-      pauseAnimationImg(node);
-    }
-  }, 50);
+function imgLoad(e) {
+  var img = e.target;
+  if (img instanceof HTMLImageElement) pauseAnimationImg(img);
 }
 
 function pauseAnimationImg(img) {
   //console.log(img);
-  if (/^http:\/\/.*\.(jpe?g|jp2|png|tiff?|bmp|dib|svgz?|ico)\b/.test(img.src) || img.src === img.getAttribute('data-original-src')) return;
+  if (/\.(jpe?g|jp2|png|tiff?|bmp|dib|svgz?|ico)\b/.test(img.src) 
+    || img.getAttribute('data-original-src')
+    || img.getAttribute('data-animation-restarted')) return;
 
   img.setAttribute('data-original-src', img.src);
   chrome.extension.sendRequest(ExtID, {type: 'img', src: img.src}, function(res) {
     //console.log([img.src, res]);
-    if (img.parentNode) {  // if img is still in the document
-      if (res.error) {
-        img.removeAttribute('data-original-src');
-      } else {
-        img.src = res.dataUrl;
-        img.addEventListener('click', handleClick, false);
-      }
-    } else { // release (probably not necessary)
-      img = null;
+    if (res.error) {
+      img.removeAttribute('data-original-src');
+    } else {
+      img.addEventListener('error', function() {
+        restartAnimation(img);
+      }, false);
+      img.addEventListener('click', function handleClick(e) {
+        e.preventDefault();
+        restartAnimation(img);
+        img.removeEventListener('click', handleClick, false);
+      }, false);
+      img.src = res.dataUrl;
     }
   });
 }
 
-function handleClick(ev) {
-  ev.preventDefault();
-  var img = ev.target;
-  startAnimation(img);
-  img.removeEventListener('click', handleClick, false);
-}
-
-function startAnimation(img) {
+function restartAnimation(img) {
   img.src = img.getAttribute('data-original-src');
   img.removeAttribute('data-original-src');
+  img.setAttribute('data-animation-restarted', 'yes');
 }
+
 
 function pauseAnimationStyleRule(style, dec, url) {
   var a = document.createElement('a');
@@ -94,33 +43,63 @@ function pauseAnimationStyleRule(style, dec, url) {
 
   chrome.extension.sendRequest(ExtID, {type: 'img', src: a.href} , function(res) {
     //console.log(res);
-    if (res.error) { // if an error occurred
-      //
-    } else {
-      style[dec] = style[dec].replace(new RegExp('url\\(\\s*'+url.replace(/\W/g,'\\$&')+'\\s*\\)', 'g'), 'url('+res.dataUrl+')');
+    if (!res.error) {
+      style[dec] = style[dec].replace(new RegExp(url.replace(/\W/g,'\\$&'), 'g'), res.dataUrl);
     }
   });
 }
 
 function pauseAnimationCSS(sheet) {
   var a = document.createElement('a');
-  a.setAttribute('href',sheet.href);
+  a.setAttribute('href', sheet.href);
 
   var base = document.querySelector('base');
-  if (base) base = base.href;
-  else base = location.href.replace(/\?.*/,'').replace(/\/[^\/]*$/, '/');
+  base = base ? base.href : location.href.replace(/[?#].*/,'').replace(/\/[^\/]*$/, '/');
 
-  chrome.extension.sendRequest(ExtID, {type:'css', src:a.href, baseUrl: base}, function(res) {
+  chrome.extension.sendRequest(ExtID, {type:'css', src: a.href, baseUrl: base}, function(res) {
     //console.log(res);
-    var node = sheet.ownerNode;
-    if (node && node.parentNode) {
-      if (res.error) { // if an error occurred
-        //
-      } else {
+    if (sheet && sheet.parentNode) {
+      if (!res.error) {
         var style = document.createElement('style');
         style.textContent = res.cssText;
-        node.parentNode.insertBefore(style, node.nextSibling);
+        sheet.parentNode.insertBefore(style, sheet.nextSibling);
       }
     }
   });
 }
+
+
+(function init() {
+  var imgs = document.images;
+  for (var i = 0; i < imgs.length; i++) {
+    pauseAnimationImg(imgs[i]);
+  }
+  document.addEventListener('load', imgLoad, true);
+
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    var rules = sheets[i].cssRules;
+    if (!rules) continue; // cross origin request (cannot get any more?)
+
+    for (var j = 0; j < rules.length; j++) {
+      var style = rules[j].style;
+      for (var k = 0; k < style.length; k++) {
+        var dec = style[k];
+        if (/url\((\S+)\)/.test(style[dec])) { // WebKit normalize the css and remove quotes and whitespaces
+          var url = RegExp.$1;
+          if (url.lastIndexOf('data:', 0) !== 0 
+            && !/\.(?:jpe?g|jp2|png|tiff?|bmp|dib|svgz?|ico)\b/.test(url)) {
+            pauseAnimationStyleRule(style, dec, url);
+          }
+        }
+      }
+    }
+  }
+
+  var links = document.getElementsByTagName('link');
+  for (var i = 0; i < links.length; i++) {
+    if (links[i].getAttribute('rel') === 'stylesheet') {
+      pauseAnimationCSS(links[i]);
+    }
+  }
+})();
