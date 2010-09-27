@@ -50,13 +50,7 @@ function pauseAnimationStyleRule(style, dec, url) {
 }
 
 function pauseAnimationCSS(sheet) {
-  var a = document.createElement('a');
-  a.setAttribute('href', sheet.href);
-
-  var base = document.querySelector('base');
-  base = base ? base.href : location.href.replace(/[?#].*/,'').replace(/\/[^\/]*$/, '/');
-
-  chrome.extension.sendRequest(ExtID, {type:'css', src: a.href, baseUrl: base}, function(res) {
+  chrome.extension.sendRequest(ExtID, {type:'css', src: sheet.href}, function(res) {
     //console.log(res);
     if (sheet && sheet.parentNode) {
       if (!res.error) {

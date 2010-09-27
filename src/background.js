@@ -34,7 +34,7 @@ chrome.extension.onRequest.addListener(function(data, sender, response) {
         }
 
         urls.forEach(function(url) {
-          request(makeAbsoluteUrl(url, data.baseUrl), 
+          request(makeAbsoluteUrl(url, data.src), 
             function(res) {
               try {
                 replaceUrls[url] = getSingleImage(res);
