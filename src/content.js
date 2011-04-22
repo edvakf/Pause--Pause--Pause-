@@ -1,29 +1,69 @@
 
+var Cache = {};
+var CacheList = [];
+var CacheCount = 20;
+
 function imgLoad(e) {
   var img = e.target;
   if (img instanceof HTMLImageElement) pauseAnimationImg(img);
 }
 
 function pauseAnimationImg(img) {
-  if (/\.(jpe?g|jp2|png|tiff?|bmp|dib|svgz?|ico)\b/.test(img.src) 
+  var src = img.src, cache;
+  if (/\.(jpe?g|jp2|png|tiff?|bmp|dib|svgz?|ico)\b/.test(src)
     || img.dataset.originalSrc
     || img.dataset.animationRestarted) return;
 
-  img.dataset.originalSrc = img.src;
-  chrome.extension.sendRequest({type: 'img', src: img.src}, function(res) {
-    //console.log([img.src, res]);
-    if (res.error) {
+  img.dataset.originalSrc = src;
+  if (cache = Cache[src]) {
+    if (cache.waiting) {
+      cache.images.push(img);
+    } else if (cache.dataUrl) {
+      img.src = cache.dataUrl;
+    } else { // error or not gif
       delete img.dataset.originalSrc;
-    } else {
-      img.addEventListener('error', function() {
-        restartAnimation(img);
-      }, false);
-      img.addEventListener('click', function handleClick(e) {
-        e.preventDefault();
-        restartAnimation(img);
-        img.removeEventListener('click', handleClick, false);
-      }, false);
-      img.src = res.dataUrl;
+    }
+    return;
+  } else {
+    CacheList.push(src);
+    Cache[src] = {
+      images: [img],
+      waiting: true
+    };
+    if (CacheList.length > CacheCount) {
+      for (var i = 0; i < CacheList.length - CacheCount; i++) {
+        var url = CacheList[i];
+        if (!Cache[url].waiting) {
+          delete Cache[url];
+          CacheList.splice(i, 1);
+          i--;
+        }
+      }
+    }
+  }
+  chrome.extension.sendRequest({type: 'img', src: src}, function(res) {
+    //console.log([src, res]);
+    if (cache = Cache[src]) {
+      cache.images.forEach(function(img) {
+        if (res.error) {
+          delete img.dataset.originalSrc;
+        } else {
+          img.addEventListener('error', function() {
+            restartAnimation(img);
+          }, false);
+          img.addEventListener('click', function handleClick(e) {
+            e.preventDefault();
+            restartAnimation(img);
+            img.removeEventListener('click', handleClick, false);
+          }, false);
+          img.src = res.dataUrl;
+        }
+      });
+      cache.images = [];
+      cache.dataUrl = res.dataUrl; // is undefined if res.error is there
+      cache.waiting = false;
+    } else { // shouldn't occur
+      throw 'unawaited image loaded background: ' + src;
     }
   });
 }
