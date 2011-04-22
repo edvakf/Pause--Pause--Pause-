@@ -1,4 +1,3 @@
-var ExtID = chrome.extension.getURL('').match(/chrome-extension:\/\/([^\/]+)\//)[1];
 
 function imgLoad(e) {
   var img = e.target;
@@ -12,7 +11,7 @@ function pauseAnimationImg(img) {
     || img.getAttribute('data-animation-restarted')) return;
 
   img.setAttribute('data-original-src', img.src);
-  chrome.extension.sendRequest(ExtID, {type: 'img', src: img.src}, function(res) {
+  chrome.extension.sendRequest({type: 'img', src: img.src}, function(res) {
     //console.log([img.src, res]);
     if (res.error) {
       img.removeAttribute('data-original-src');
@@ -41,7 +40,7 @@ function pauseAnimationStyleRule(style, dec, url) {
   var a = document.createElement('a');
   a.setAttribute('href', url);
 
-  chrome.extension.sendRequest(ExtID, {type: 'img', src: a.href} , function(res) {
+  chrome.extension.sendRequest({type: 'img', src: a.href} , function(res) {
     //console.log(res);
     if (!res.error) {
       style[dec] = style[dec].replace(new RegExp(url.replace(/\W/g,'\\$&'), 'g'), res.dataUrl);
@@ -50,7 +49,7 @@ function pauseAnimationStyleRule(style, dec, url) {
 }
 
 function pauseAnimationCSS(sheet) {
-  chrome.extension.sendRequest(ExtID, {type:'css', src: sheet.href}, function(res) {
+  chrome.extension.sendRequest({type:'css', src: sheet.href}, function(res) {
     //console.log(res);
     if (sheet && sheet.parentNode) {
       if (!res.error) {
