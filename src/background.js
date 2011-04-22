@@ -78,9 +78,12 @@ function request(url, callback, errorback) {
   xhr.send(null);
 }
 
+var re_GIFANIMATION = /^(GIF8[79]a[\s\S]{7,775})(\x21\xf9[\s\S]{5}\0)*([\s\S]*?)(\x21\xff\x0bNETSCAPE2\.0[\s\S]\x01[\s\S]{2}\0)([\s\S]*?)(\x21\xf9[\s\S]{5}\0)(\x2c[\s\S]*?\0)(\x21\xf9)/;
+var re_OUTOFASCII = /[\u0100-\uffff]/g;
+
 function getSingleImage(xhr) {
   var type = xhr.getResponseHeader('Content-Type');
-  var body = xhr.responseText.replace(/[\u0100-\uffff]/g, function(c){ 
+  var body = xhr.responseText.replace(re_OUTOFASCII, function(c){ 
     return String.fromCharCode(c.charCodeAt(0) & 0xff);
   });
 
@@ -101,7 +104,7 @@ function getSingleImage(xhr) {
     //
     // Normal GIF have neither the Application Extension nor the repeating part
 
-    if (/^(GIF8[79]a[\s\S]{7,775})(\x21\xf9[\s\S]{5}\0)*([\s\S]*?)(\x21\xff\x0bNETSCAPE2\.0[\s\S]\x01[\s\S]{2}\0)([\s\S]*?)(\x21\xf9[\s\S]{5}\0)(\x2c[\s\S]*?\0)(\x21\xf9)/.test(body)) {
+    if (re_GIFANIMATION.test(body)) {
       var nonAnimatedGif = [
         RegExp.$1, // Gif Header
         RegExp.$2, // Possible graphic control
@@ -120,19 +123,24 @@ function getSingleImage(xhr) {
   throw new Error('ERROR: Image is not an animatable format.');
 }
 
+var re_CSSURLLITERAL = /url\(\s*('|")?(\S+)\1\s*\)/g;
+var re_NONGIF = /\.(?:jpe?g|jp2|png|tiff?|bmp|dib|svgz?|ico)\b/;
 
 function extractAnimationUrls(cssText) {
   var urls = [], m;
-  while (m = /url\(\s*('|")?(\S+)\1\s*\)/g.exec(cssText)) {
+  while (m = re_CSSURLLITERAL.exec(cssText)) {
     var url = m[2];
-    if (url.lastIndexOf('data:',0) !== 0 && !/\.(?:jpe?g|jp2|png|tiff?|bmp|dib|svgz?|ico)\b/.test(url)) urls.push(url);
+    if (url.lastIndexOf('data:',0) !== 0 && !re_NONGIF.test(url)) urls.push(url);
   }
   return urls.filter(function(x, i) {return urls.indexOf(x) === i}); // unique
 }
 
+var re_HTTP = /^https?:/;
+var re_ORIGIN = /^(https?:\/\/[^\/]*).*$/;
+
 function makeAbsoluteUrl(url, baseUrl) {
-  if (/^https?:/.test(url)) return url;
-  if (url.indexOf('/') === 0) return baseUrl.replace(/^(https?:\/\/[^\/]*)(.*)$/, function($0,$1,$2) {return $1 + url});
+  if (re_HTTP.test(url)) return url;
+  if (url.indexOf('/') === 0) return baseUrl.replace(re_ORIGIN, function($0,$1) {return $1 + url});
   return baseUrl + url;
 }
 

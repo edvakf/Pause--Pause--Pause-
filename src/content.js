@@ -8,9 +8,11 @@ function imgLoad(e) {
   if (img instanceof HTMLImageElement) pauseAnimationImg(img);
 }
 
+var re_NONGIF = /\.(jpe?g|jp2|png|tiff?|bmp|dib|svgz?|ico)\b/;
+
 function pauseAnimationImg(img) {
   var src = img.src, cache;
-  if (/\.(jpe?g|jp2|png|tiff?|bmp|dib|svgz?|ico)\b/.test(src)
+  if (re_NONGIF.test(src)
     || img.dataset.originalSrc
     || img.dataset.animationRestarted) return;
 
@@ -121,7 +123,7 @@ function pauseAnimationCSS(sheet) {
         if (/url\((\S+)\)/.test(style[dec])) { // WebKit normalize the css and remove quotes and whitespaces
           var url = RegExp.$1;
           if (url.lastIndexOf('data:', 0) !== 0 
-            && !/\.(?:jpe?g|jp2|png|tiff?|bmp|dib|svgz?|ico)\b/.test(url)) {
+            && !re_NONGIF.test(url)) {
             pauseAnimationStyleRule(style, dec, url);
           }
         }
