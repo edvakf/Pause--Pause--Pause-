@@ -75,6 +75,7 @@ function pauseAnimationCSS(sheet) {
 
     for (var j = 0; j < rules.length; j++) {
       var style = rules[j].style;
+      if (!style) continue; // style is undefined if rules[j] is a CSSImportRule
       for (var k = 0; k < style.length; k++) {
         var dec = style[k];
         if (/url\((\S+)\)/.test(style[dec])) { // WebKit normalize the css and remove quotes and whitespaces
