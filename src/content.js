@@ -5,16 +5,15 @@ function imgLoad(e) {
 }
 
 function pauseAnimationImg(img) {
-  //console.log(img);
   if (/\.(jpe?g|jp2|png|tiff?|bmp|dib|svgz?|ico)\b/.test(img.src) 
-    || img.getAttribute('data-original-src')
-    || img.getAttribute('data-animation-restarted')) return;
+    || img.dataset.originalSrc
+    || img.dataset.animationRestarted) return;
 
-  img.setAttribute('data-original-src', img.src);
+  img.dataset.originalSrc = img.src;
   chrome.extension.sendRequest({type: 'img', src: img.src}, function(res) {
     //console.log([img.src, res]);
     if (res.error) {
-      img.removeAttribute('data-original-src');
+      delete img.dataset.originalSrc;
     } else {
       img.addEventListener('error', function() {
         restartAnimation(img);
@@ -30,9 +29,9 @@ function pauseAnimationImg(img) {
 }
 
 function restartAnimation(img) {
-  img.src = img.getAttribute('data-original-src');
-  img.removeAttribute('data-original-src');
-  img.setAttribute('data-animation-restarted', 'yes');
+  img.src = img.dataset.originalSrc;
+  delete img.dataset.originalSrc;
+  img.dataset.animationRestarted = 'yes';
 }
 
 
