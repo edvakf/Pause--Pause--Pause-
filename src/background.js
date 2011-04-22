@@ -58,6 +58,10 @@ function request(url, callback, errorback) {
   var xhr = new XMLHttpRequest;
   xhr.open('GET', url, true);
 
+  // If this header is present, some non-image files cannot be read from cache
+  // but image files cannot be read from cache anyway. so it's better to have this header.
+  xhr.setRequestHeader('If-Modified-Since', new Date().toUTCString());
+
   //XHR binary charset opt by Marcus Granado 2006 [http://mgran.blogspot.com]
   xhr.overrideMimeType('text/plain; charset=x-user-defined');
 
